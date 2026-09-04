@@ -138,7 +138,10 @@
 </div>
 
 <script>
-  // Default questions, used until a CSV is loaded
+  // Name of the CSV file to auto-load from the same folder as this page
+  const CSV_FILENAME = 'question.csv';
+
+  // Fallback questions, used only if the CSV can't be found/loaded
   let questions = [
     "What's a skill you've always wanted to learn?",
     "What's the best piece of advice you've ever received?",
@@ -196,40 +199,63 @@
 
   chooseFileBtn.addEventListener('click', () => csvInput.click());
 
+  function applyParsedRows(rows, sourceLabel) {
+    rows = rows.map(row => (row[0] || "").trim()).filter(cell => cell.length > 0);
+
+    if (rows.length > 0 && rows[0].toLowerCase() === "question") {
+      rows = rows.slice(1);
+    }
+
+    if (rows.length === 0) {
+      statusEl.textContent = "No questions found in that file.";
+      statusEl.className = "status error";
+      return false;
+    }
+
+    questions = rows;
+    lastIndex = -1;
+    count = 0;
+    statusEl.textContent = `Loaded ${rows.length} questions from ${sourceLabel}`;
+    statusEl.className = "status success";
+    counterEl.textContent = `Using ${rows.length} questions from file`;
+    questionEl.textContent = "Click \"New Question\" to get started!";
+    return true;
+  }
+
   csvInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     Papa.parse(file, {
-      complete: function(results) {
-        let rows = results.data
-          .map(row => (row[0] || "").trim())
-          .filter(cell => cell.length > 0);
-
-        if (rows.length > 0 && rows[0].toLowerCase() === "question") {
-          rows = rows.slice(1);
-        }
-
-        if (rows.length === 0) {
-          statusEl.textContent = "No questions found in that file.";
-          statusEl.className = "status error";
-          return;
-        }
-
-        questions = rows;
-        lastIndex = -1;
-        count = 0;
-        statusEl.textContent = `Loaded ${rows.length} questions from ${file.name}`;
-        statusEl.className = "status success";
-        counterEl.textContent = `Using ${rows.length} questions from file`;
-        questionEl.textContent = "Click \"New Question\" to get started!";
-      },
+      complete: (results) => applyParsedRows(results.data, file.name),
       error: function(err) {
         statusEl.textContent = "Couldn't read that file: " + err.message;
         statusEl.className = "status error";
       }
     });
   });
+
+  // Auto-load the CSV sitting next to this page (e.g. in the same GitHub repo)
+  function loadCsvFromRepo() {
+    statusEl.textContent = `Loading ${CSV_FILENAME}...`;
+    statusEl.className = "status";
+
+    fetch(CSV_FILENAME)
+      .then(response => {
+        if (!response.ok) throw new Error('File not found (' + response.status + ')');
+        return response.text();
+      })
+      .then(text => {
+        const results = Papa.parse(text.trim());
+        applyParsedRows(results.data, CSV_FILENAME);
+      })
+      .catch(err => {
+        statusEl.textContent = `Couldn't auto-load ${CSV_FILENAME} (${err.message}). Using default questions, or load a CSV manually.`;
+        statusEl.className = "status error";
+      });
+  }
+
+  loadCsvFromRepo();
 </script>
 
 </body>
