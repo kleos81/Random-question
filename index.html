@@ -279,26 +279,45 @@
   });
 
   // Auto-load the CSV sitting next to this page (e.g. in the same GitHub repo)
-  function loadCsvFromRepo() {
+  async function loadCsvFromRepo() {
     statusEl.textContent = `Loading ${CSV_FILENAME}...`;
     statusEl.className = "status";
 
-    fetch(CSV_FILENAME)
-      .then(response => {
-        if (!response.ok) throw new Error('File not found (' + response.status + ')');
-        return response.text();
-      })
-      .then(text => {
-        const results = Papa.parse(text, { skipEmptyLines: true });
-        if (results.errors?.length) {
-          throw new Error("CSV contains formatting errors");
-        }
-        applyParsedRows(results.data, CSV_FILENAME);
-      })
-      .catch(err => {
-        statusEl.textContent = `Couldn't auto-load ${CSV_FILENAME} (${err.message}). Using default questions, or load a CSV manually.`;
-        statusEl.className = "status error";
+    try {
+      // Load question.csv from the same folder as index.html.
+      // This works on GitHub Pages when both files are in the same folder.
+      const csvUrl = new URL(CSV_FILENAME, window.location.href);
+      const response = await fetch(csvUrl.href, {
+        method: "GET",
+        cache: "no-store"
       });
+
+      if (!response.ok) {
+        throw new Error(`File not found (${response.status})`);
+      }
+
+      const csvText = await response.text();
+
+      if (!csvText.trim()) {
+        throw new Error("CSV file is empty");
+      }
+
+      const results = Papa.parse(csvText, {
+        skipEmptyLines: true
+      });
+
+      if (results.errors?.length) {
+        throw new Error("CSV contains formatting errors");
+      }
+
+      if (!applyParsedRows(results.data, CSV_FILENAME)) {
+        throw new Error("No questions found");
+      }
+    } catch (err) {
+      statusEl.textContent =
+        `Couldn't auto-load ${CSV_FILENAME} (${err.message}). Using default questions, or load a CSV manually.`;
+      statusEl.className = "status error";
+    }
   }
 
   loadCsvFromRepo();
