@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Random Question Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 20px;
+  }
+
+  .card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 48px 40px;
+    max-width: 520px;
+    width: 100%;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    text-align: center;
+  }
+
+  .label {
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #8b5cf6;
+    margin-bottom: 16px;
+  }
+
+  #question {
+    font-size: 24px;
+    font-weight: 600;
+    color: #1f2937;
+    line-height: 1.4;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s ease;
+  }
+
+  #question.fade {
+    opacity: 0;
+  }
+
+  button {
+    margin-top: 28px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    padding: 14px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+    margin-left: 6px;
+    margin-right: 6px;
+  }
+
+  button:hover {
+    background: #4f46e5;
+  }
+
+  button:active {
+    transform: scale(0.97);
+  }
+
+  button.secondary {
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  button.secondary:hover {
+    background: #e5e7eb;
+  }
+
+  .counter {
+    margin-top: 16px;
+    font-size: 13px;
+    color: #9ca3af;
+  }
+
+  .file-row {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .file-label {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  #csvInput {
+    display: none;
+  }
+
+  .status {
+    margin-top: 10px;
+    font-size: 13px;
+    min-height: 18px;
+  }
+
+  .status.success { color: #059669; }
+  .status.error { color: #dc2626; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="label">Question</div>
+  <div id="question">Click "New Question" to get started!</div>
+
+  <div>
+    <button id="randomizeBtn">🎲 New Question</button>
+  </div>
+  <div class="counter" id="counter">Using 15 default questions</div>
+
+  <div class="file-row">
+    <span class="file-label">Load your own questions from a CSV file (one question per row, first column)</span>
+    <button class="secondary" id="chooseFileBtn">📁 Load CSV</button>
+    <input type="file" id="csvInput" accept=".csv" />
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script>
+  // Default questions, used until a CSV is loaded
+  let questions = [
+    "What's a skill you've always wanted to learn?",
+    "What's the best piece of advice you've ever received?",
+    "If you could travel anywhere right now, where would you go?",
+    "What's your favorite way to spend a weekend?",
+    "What's a book or movie that changed how you think?",
+    "If you could have dinner with anyone, living or dead, who would it be?",
+    "What's something you're proud of that most people don't know about?",
+    "What's your go-to comfort food?",
+    "If you had an extra hour every day, how would you use it?",
+    "What's the most useful app on your phone?",
+    "What's a habit you're trying to build or break?",
+    "What's the best trip you've ever taken?",
+    "If you could master any instrument instantly, which would you pick?",
+    "What's something that always makes you laugh?",
+    "What's a goal you're working toward this year?"
+  ];
+
+  const questionEl = document.getElementById('question');
+  const btn = document.getElementById('randomizeBtn');
+  const counterEl = document.getElementById('counter');
+  const chooseFileBtn = document.getElementById('chooseFileBtn');
+  const csvInput = document.getElementById('csvInput');
+  const statusEl = document.getElementById('status');
+
+  let lastIndex = -1;
+  let count = 0;
+
+  function getRandomIndex() {
+    if (questions.length <= 1) return 0;
+    let index;
+    do {
+      index = Math.floor(Math.random() * questions.length);
+    } while (index === lastIndex);
+    return index;
+  }
+
+  function showRandomQuestion() {
+    if (questions.length === 0) {
+      questionEl.textContent = "No questions loaded. Please load a CSV file.";
+      return;
+    }
+    questionEl.classList.add('fade');
+    setTimeout(() => {
+      const index = getRandomIndex();
+      lastIndex = index;
+      questionEl.textContent = questions[index];
+      questionEl.classList.remove('fade');
+      count++;
+      counterEl.textContent = `Question ${count}`;
+    }, 150);
+  }
+
+  btn.addEventListener('click', showRandomQuestion);
+
+  chooseFileBtn.addEventListener('click', () => csvInput.click());
+
+  csvInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      complete: function(results) {
+        let rows = results.data
+          .map(row => (row[0] || "").trim())
+          .filter(cell => cell.length > 0);
+
+        if (rows.length > 0 && rows[0].toLowerCase() === "question") {
+          rows = rows.slice(1);
+        }
+
+        if (rows.length === 0) {
+          statusEl.textContent = "No questions found in that file.";
+          statusEl.className = "status error";
+          return;
+        }
+
+        questions = rows;
+        lastIndex = -1;
+        count = 0;
+        statusEl.textContent = `Loaded ${rows.length} questions from ${file.name}`;
+        statusEl.className = "status success";
+        counterEl.textContent = `Using ${rows.length} questions from file`;
+        questionEl.textContent = "Click \"New Question\" to get started!";
+      },
+      error: function(err) {
+        statusEl.textContent = "Couldn't read that file: " + err.message;
+        statusEl.className = "status error";
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
