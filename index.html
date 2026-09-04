@@ -22,7 +22,7 @@
     background: #ffffff;
     border-radius: 20px;
     padding: 48px 40px;
-    max-width: 520px;
+    max-width: 760px;
     width: 100%;
     box-shadow: 0 20px 50px rgba(0,0,0,0.25);
     text-align: center;
@@ -41,8 +41,11 @@
     font-size: 24px;
     font-weight: 600;
     color: #1f2937;
-    line-height: 1.2;
-    min-height: 100px;
+    line-height: 1.35;
+    min-height: 180px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 10px 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -116,13 +119,42 @@
 
   .status.success { color: #059669; }
   .status.error { color: #dc2626; }
+
+  @media (max-width: 560px) {
+    body {
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .card {
+      padding: 36px 24px;
+      border-radius: 16px;
+    }
+
+    #question {
+      font-size: 21px;
+      min-height: 180px;
+      max-height: 360px;
+    }
+
+    button {
+      width: 100%;
+      margin-left: 0;
+      margin-right: 0;
+    }
+  }
+
+  button:focus-visible {
+    outline: 3px solid rgba(99, 102, 241, 0.35);
+    outline-offset: 3px;
+  }
 </style>
 </head>
 <body>
 
 <div class="card">
   <div class="label">Question</div>
-  <div id="question">Click "New Question" to get started!</div>
+  <div id="question" role="status" aria-live="polite">Click "New Question" to get started!</div>
 
   <div>
     <button id="randomizeBtn">🎲 New Question</button>
@@ -132,7 +164,7 @@
   <div class="file-row">
     <span class="file-label">Load your own questions from a CSV file (one question per row, first column)</span>
     <button class="secondary" id="chooseFileBtn">📁 Load CSV</button>
-    <input type="file" id="csvInput" accept=".csv" />
+    <input type="file" id="csvInput" accept=".csv,text/csv" aria-label="Choose a CSV file" />
     <div class="status" id="status"></div>
   </div>
 </div>
@@ -200,7 +232,9 @@
   chooseFileBtn.addEventListener('click', () => csvInput.click());
 
   function applyParsedRows(rows, sourceLabel) {
-    rows = rows.map(row => (row[0] || "").trim()).filter(cell => cell.length > 0);
+    rows = rows
+      .map(row => String(row?.[0] ?? "").replace(/^\uFEFF/, "").trim())
+      .filter(cell => cell.length > 0);
 
     if (rows.length > 0 && rows[0].toLowerCase() === "question") {
       rows = rows.slice(1);
@@ -227,10 +261,19 @@
     if (!file) return;
 
     Papa.parse(file, {
-      complete: (results) => applyParsedRows(results.data, file.name),
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.errors?.length) {
+          statusEl.textContent = "CSV loaded with some formatting warnings. Check that each question is in the first column.";
+          statusEl.className = "status error";
+        }
+        applyParsedRows(results.data, file.name);
+        csvInput.value = "";
+      },
       error: function(err) {
-        statusEl.textContent = "Couldn't read that file: " + err.message;
+        statusEl.textContent = "Couldn't read that file: " + (err?.message || "Unknown error");
         statusEl.className = "status error";
+        csvInput.value = "";
       }
     });
   });
@@ -246,7 +289,10 @@
         return response.text();
       })
       .then(text => {
-        const results = Papa.parse(text.trim());
+        const results = Papa.parse(text, { skipEmptyLines: true });
+        if (results.errors?.length) {
+          throw new Error("CSV contains formatting errors");
+        }
         applyParsedRows(results.data, CSV_FILENAME);
       })
       .catch(err => {
